@@ -1,56 +1,95 @@
-# 🎮 Game Glitch Investigator: The Impossible Guesser
+# AI-Powered Game Glitch Investigator
 
-## 🚨 The Situation
+## Base Project and Original Scope
 
-You asked an AI to build a simple "Number Guessing Game" using Streamlit.
-It wrote the code, ran away, and now the game is unplayable.
+This project extends the original **Streamlit Number Guessing Game** starter.
+Originally, the system let a user choose a difficulty, guess a hidden number, receive higher/lower hints, and track score and attempts.
+The starter lab goal was to debug broken AI-generated logic and state handling.
 
-## 🛠️ Setup
+## What Was Added (Substantial AI Feature)
 
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run the broken app: `python -m streamlit run app.py`
+The app now includes an integrated **AI Guess Strategist** with a multi-step workflow:
 
-## 🕵️‍♂️ Your Mission
+1. **Plan step** (`plan_ai_guess`): infer possible number bounds from prior hints and propose the next guess.
+2. **Guardrail step** (`guardrail_ai_guess`): validate plan output and automatically repair invalid guesses.
+3. **Execution step**: apply the final guess to the live game and store a trace (plan, guardrail status, confidence, outcome).
 
-1. **Play the game.** Open the "Developer Debug Info" tab in the app to see the secret number. Try to win.
-2. **Find the State Bug.** Why does the secret number change every time you click "Submit"? Ask ChatGPT: _"How do I keep a variable from resetting in Streamlit when I click a button?"_
-3. **Fix the Logic.** The hints ("Higher/Lower") are wrong. Fix them.
-4. **Refactor & Test.** - Move the logic into `logic_utils.py`.
-   - Run `pytest` in your terminal.
-   - Keep fixing until all tests pass!
+This is integrated into the main app via the `AI Suggest Next Guess 🤖` button and affects real gameplay state, score, and outcomes.
 
-## 📝 Document Your Experience
+## Architecture Diagram
 
-- The game is a simple number guessing game built with Streamlit where the player tries to guess a hidden secret number within a limited number of attempts. The player chooses a difficulty, which sets both the range of possible numbers and how many guesses they get. After each guess, the game gives a hint telling the player whether they should go higher or lower, and it tracks a score based on how efficiently they guess. The purpose of the project is not just to play, but to investigate and fix glitches in an AI‑generated codebase, especially around state and game logic.
+```mermaid
+flowchart TD
+    A[User Input in Streamlit UI] --> B[app.py Controller]
+    B --> C[Core Rules in logic_utils.py]
+    C --> D[check_guess + score update]
+    B --> E[AI Planner plan_ai_guess]
+    E --> F[Guardrail Validator guardrail_ai_guess]
+    F --> D
+    D --> G[Session State Store]
+    G --> H[UI feedback + history + agent trace]
+    C --> I[evaluate_ai.py Evaluation Harness]
+    I --> J[Win rate / attempts / guardrail repairs]
+```
 
-- ## Issues Identified
+## Reliability / Evaluation / Guardrails
 
-- The **"higher/lower" hints were reversed**. When my guess was too low, the game told me to go lower, and when it was too high, it told me to go higher.
+- **Input validation:** empty/non-numeric/out-of-range values are blocked.
+- **AI output guardrail:** invalid AI guesses are auto-repaired to a safe bounded midpoint.
+- **Evaluation harness:** `evaluate_ai.py` runs deterministic scenarios and reports win rate, attempts, and guardrail interventions.
 
-- After clicking **"New Game"** following a win or loss, the app still displayed **"You already won"** or **“Game over”**, and the game did not properly start a new round.
+Example reliability behavior:
+- If AI proposes `999` in a `1-100` game with narrowed bounds `51-74`, guardrail repairs to midpoint in-range.
 
-- The **difficulty ranges were inconsistent**. The sidebar showed ranges like **1-20 for Easy**, but the game text and secret number behaved as if the range was **always 1–100**.
+## Setup
 
-- The app allowed users to **enter any integer**, even numbers far outside the supposed bounds, without showing an error.
+1. Create/activate a virtual environment (recommended).
+2. Install dependencies:
+   - `pip install -r requirements.txt`
+3. Run tests:
+   - `pytest`
 
-- There were **state management issues** with the **attempt counter and secret number**, which made the game feel inconsistent and unfair.
+## Run End-to-End System
 
-- I corrected the hint logic so that a too‑low guess now correctly tells the player to go higher, and a too‑high guess tells them to go lower. I updated the “New Game” behavior to reset the game state (status, attempts, and secret) so that starting a new game really gives a clean slate instead of carrying over “Game over” or “You already won” messages. I made the displayed range and the actual secret number generation respect the selected difficulty, and I added validation so guesses have to fall inside that range. Finally, I relied on Streamlit’s st.session_state so the secret number and attempts stay stable across reruns, and I used small tests (like calling check_guess with known values) to confirm that only the buggy parts changed while the rest of the app kept working as intended.
+### Streamlit UI
 
-## 📸 Demo
+Run:
+- `python -m streamlit run app.py`
 
-- **Correct "Go Higher" hint**
+In the app:
+1. Pick difficulty.
+2. Play manually with `Submit Guess 🚀`, or
+3. Enable `AI Guess Strategist` and click `AI Suggest Next Guess 🤖`.
 
-  ![Go Higher hint screenshot](Go%20Higher.png)
+### Evaluation Script
 
-- **Correct "Go Lower" hint**
+Run:
+- `python evaluate_ai.py`
 
-  ![Go Lower hint screenshot](Go%20Lower.png)
+This demonstrates full workflow for 3 sample inputs (`secret=7`, `42`, `88`) and prints stable metrics.
 
-- **Winning game state**
+## Sample Input/Output
 
-  ![Winning game screenshot](Winning.png)
+### Sample UI Inputs
+- Difficulty: `Normal`
+- User guess: `40` -> Hint: `Go HIGHER`
+- User guess: `60` -> Hint: `Go LOWER`
+- AI step -> planned guess + guardrail status shown in UI
 
-- **Out-of-range / error handling**
+### Sample Evaluation Output
 
-  ![Error state screenshot](Error.png)
+```text
+=== AI Strategist Evaluation ===
+Scenarios: 3
+Wins: 3/3
+Average attempts: 5.67
+Guardrail repairs: 0
+...
+```
+
+## Demo Screenshots
+
+- Correct "Go Higher" hint: ![Go Higher hint screenshot](Go%20Higher.png)
+- Correct "Go Lower" hint: ![Go Lower hint screenshot](Go%20Lower.png)
+- Winning game state: ![Winning game screenshot](Winning.png)
+- Out-of-range error handling: ![Error state screenshot](Error.png)

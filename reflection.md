@@ -1,58 +1,21 @@
-# 💭 Reflection: Game Glitch Investigator
+# Reflection: AI Collaboration and System Design
 
-Answer each question in 3 to 5 sentences. Be specific and honest about what actually happened while you worked. This is about your process, not trying to sound perfect.
+## Original Bugs and Baseline
 
-## 1. What was broken when you started?
+When I started, the game had multiple reliability issues: hint direction could be wrong, session state behavior was inconsistent across reruns, and game reset behavior was not always clean after win/loss states. Range handling and validation were also fragile, so out-of-bound guesses could still interfere with game flow. The base project worked as a small Streamlit guessing game, but it was not robust enough to trust repeated use.
 
-- The hints (Lower/Higher) were backwards. I expected the hint to say higher if my guess was too low and hint to say lower if my guess was, I suppose, too high. But the opposite was the reality.
+## How I Used AI During Development
 
-- When a user wins or is out of attempts and clicks "new game" the modal saying "game over" or "You've already won" still persists. I guessed when someone clicks "new game", we start with a fresh start with no information from the previous game but thta was not true here. You can't actually play a new round after winning/losing; you're stuck seeing the same "You already won" / "Game over" message.
+I used AI in three ways: prompt-based debugging, refactoring guidance, and test generation. First, I asked it to isolate pure game logic from UI code and suggest deterministic functions to test. Next, I used it to design a multi-step AI planner workflow (plan -> validate -> execute) instead of only patching surface bugs. Finally, I used AI-generated test ideas, then adapted them to match actual behavior and edge cases in this project.
 
-- For "Easy" mode the range says integers from 1 - 20. But the secret number is always between integrers 1 - 100. Similarly, for medium and hard, the actual game does not care about the rules on the interval.
+## Helpful vs Flawed AI Suggestions
 
-- The game allows me to input any integer numbers regardless of the limit they set (from 1 - 100 etc.)
+A very helpful suggestion was to introduce a guardrail layer between AI planning and final execution. That changed the design from "AI recommends a guess" to "AI recommends, then self-check verifies," which is much safer. A flawed suggestion was an earlier version of tests that assumed the wrong return type from `check_guess`; that would have caused false failures. I corrected this by rewriting tests to assert tuple outputs (`outcome, message`) and by adding guardrail-focused tests.
 
----
+## Reliability and Validation Mindset
 
-## 2. How did you use AI as a teammate?
+I now treat AI features as probabilistic components that require validation, not as trusted outputs. In this project, I added input validation, bounded AI behavior, and an evaluation harness script (`evaluate_ai.py`) to verify performance across multiple secrets. This made the app behavior repeatable and inspectable instead of depending on one-off manual trials.
 
-- I used Composer 1.5 rasoning from Cursor
-- Composer did a very good job finding glitches I missed on my own. For example, I hadn't thought of the problem of being able to input lierally any number regardless of the boundary (which was unchecked in the original version)
-- Normally I am very happy with the test cases AI generates but this time the test cases were mostly Terminal based, so printing a few things when I am clicking on certain buttons. That seemed less useful since I already have the "Developer Bug info" section within the website.
+## System Limitations and Future Improvements
 
----
-
-## 3. Debugging and testing your fixes
-
-- How did you decide whether a bug was really fixed?
-  - I checked frequently, tested with edge cases on my own and even without the test code, I succeeded.
-- Describe at least one test you ran (manual or using pytest)  
-  and what it showed you about your code.
-  - For the reversed go lower or higher, I used the following test to see if the code was doing as intended:
-    print(check_guess(60, 50))  
-    print(check_guess(40, 50))  
-    print(check_guess(50, 50))
-- Did AI help you design or understand any tests? How?
-  - Since the website is on the simpler side, I can't say I learned a lot, however, I did learn that if there is a way to check for bugs already built into the website then asking AI to make more bug looker code can give you some less useful code. It may just reiterate what's already on the website.
-
----
-
-## 4. What did you learn about Streamlit and state?
-
-- In your own words, explain why the secret number kept changing in the original app.
-  - Streamlit probably reruns the whole code over and over again without storing unnecessary things in the st.sesion_state. That meant the "goal" kept changing so that the use could never rely on the same number being used multiple times. The OG way of doing this is the good old fashioned random.randint(...)
-- How would you explain Streamlit "reruns" and session state to a friend who has never used Streamlit?
-  - Normally, local python variables vanish everytime the user changes the number or clicks or changes a widget etc. So, nothing gets saved. But Streamlit has st.session_state which works like a disctionary which survives those reruns and saves the inetractions for the next iteration. It works almost like a loop where even though the UI refreshes after running the whole script over and over again, the scores, and secret numbers are kept stable.
-- What change did you make that finally gave the game a stable secret number?
-  - Instead of running random,randint(...) over and over again, the secret number is checked if it's in the st.session_state of not and only if it's not, then we assign it a random number, so that it doesn't change for every instance.
-
----
-
-## 5. Looking ahead: your developer habits
-
-- What is one habit or strategy from this project that you want to reuse in future labs or projects?
-  - Every time I ask an AI to help debug certain part of the code, I need to make sure that the code AI is changing is only the code that needs changing. Noting more should be modified. The best way to prevent that from happening is to ask it for test cases.
-- What is one thing you would do differently next time you work with AI on a coding task?
-  - I wouldn't ask for bug looking code if my codebase already has a way to look for bugs.
-- In one or two sentences, describe how this project changed the way you think about AI generated code.
-  - When used with properly documented prompts, an AI can be my best coding partner. I don't have to debug the code that AI gives if the AI know's the context and the content of the problem I am trying to solve.
+The current AI strategist uses a deterministic binary-search style policy, so it is reliable but not very adaptive or language-aware. A next step would be adding model-driven reasoning (for explanations) while keeping the same guardrail contract, plus saving run metrics to a file for trend tracking over time. I would also add UI-level integration tests and a replay mode to compare "manual player vs AI strategist" over many games.
